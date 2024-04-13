@@ -3,25 +3,32 @@ from pymongo import MongoClient
 import psycopg
 import requests
 
-app = Flask(__name__, static_url_path='', static_folder='static')
+# Constants and configurations
+API_KEY = '2c96346235e54c7f9f7542fc3e69d6da'
+MONGO_URI = 'localhost'
+MONGO_PORT = 27017
+PSQL_HOST = "localhost"
+PSQL_DB = "my_database"
+PSQL_USER = "postgres"
+PSQL_PASS = ""
+STATIC_URL_PATH = ''
+STATIC_FOLDER = 'static'
+APP_PORT = 5010
 
-# MongoDB setup
-client = MongoClient('localhost', 27017)
+app = Flask(__name__, static_url_path=STATIC_URL_PATH, static_folder=STATIC_FOLDER)
+
+# Database setup
+client = MongoClient(MONGO_URI, MONGO_PORT)
 db = client.nfl
 players_collection = db.players
-
-# PostgreSQL connection setup
 conn = psycopg.connect(
-    host="localhost",
-    dbname="my_database",
-    user="postgres",
-    password="991106"
+    host=PSQL_HOST,
+    dbname=PSQL_DB,
+    user=PSQL_USER,
+    password=PSQL_PASS
 )
 
-# Define API key globally
-API_KEY = '2c96346235e54c7f9f7542fc3e69d6da'
-
-# HTML template with enhanced features for centering table content and adding an image
+# HTML template
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -58,14 +65,58 @@ HTML_TEMPLATE = """
     {% if player_info %}
         <h2>{{ player_name }}</h2>
         <table>
-            <tr><th>Team</th><th>Number</th><th>Position</th><th>Status</th><th>Height</th><th>Weight</th><th>College</th><th>Fantasy Position</th></tr>
-            <tr><td>{{ player_info['Team'] }}</td><td>{{ player_info['Number'] }}</td><td>{{ player_info['Position'] }}</td><td>{{ player_info['Status'] }}</td><td>{{ player_info['Height'] }}</td><td>{{ player_info['Weight'] }}</td><td>{{ player_info['College'] }}</td><td>{{ player_info['FantasyPosition'] }}</td></tr>
+            <tr>
+                <th>Team</th>
+                <th>Number</th>
+                <th>Position</th>
+                <th>Status</th>
+                <th>Height</th>
+                <th>Weight</th>
+                <th>College</th>
+                <th>Fantasy Position</th>
+            </tr>
+            <tr>
+                <td>{{ player_info['Team'] }}</td>
+                <td>{{ player_info['Number'] }}</td>
+                <td>{{ player_info['Position'] }}</td>
+                <td>{{ player_info['Status'] }}</td>
+                <td>{{ player_info['Height'] }}</td>
+                <td>{{ player_info['Weight'] }}</td>
+                <td>{{ player_info['College'] }}</td>
+                <td>{{ player_info['FantasyPosition'] }}</td>
+            </tr>
         </table>
         <h3>Player Fantasy Stats</h3>
         <table>
-            <tr><th>Week</th><th>Home/Away</th><th>Opponent</th><th class='bold'>FantasyPointsPPR</th><th>Passing Yards</th><th>Rushing Yards</th><th>Receiving Yards</th><th>Touchdowns</th><th>Interceptions</th><th>Fumbles</th><th>Tackles</th><th>Sacks</th></tr>
+            <tr>
+                <th>Week</th>
+                <th>Home/Away</th>
+                <th>Opponent</th>
+                <th class='bold'>FantasyPointsPPR</th>
+                <th>Passing Yards</th>
+                <th>Rushing Yards</th>
+                <th>Receiving Yards</th>
+                <th>Touchdowns</th>
+                <th>Interceptions</th>
+                <th>Fumbles</th>
+                <th>Tackles</th>
+                <th>Sacks</th>
+            </tr>
             {% for stat in player_stats %}
-                <tr><td>{{ stat.Week }}</td><td>{{ stat.HomeOrAway }}</td><td>{{ stat.Opponent }}</td><td class='bold'>{{ stat.FantasyPointsPPR }}</td><td>{{ stat.PassingYards }}</td><td>{{ stat.RushingYards }}</td><td>{{ stat.ReceivingYards }}</td><td>{{ stat.Touchdowns }}</td><td>{{ stat.Interceptions }}</td><td>{{ stat.Fumbles }}</td><td>{{ stat.Tackles }}</td><td>{{ stat.Sacks }}</td></tr>
+            <tr>
+                <td>{{ stat.Week }}</td>
+                <td>{{ stat.HomeOrAway }}</td>
+                <td>{{ stat.Opponent }}</td>
+                <td class='bold'>{{ stat.FantasyPointsPPR }}</td>
+                <td>{{ stat.PassingYards }}</td>
+                <td>{{ stat.RushingYards }}</td>
+                <td>{{ stat.ReceivingYards }}</td>
+                <td>{{ stat.Touchdowns }}</td>
+                <td>{{ stat.Interceptions }}</td>
+                <td>{{ stat.Fumbles }}</td>
+                <td>{{ stat.Tackles }}</td>
+                <td>{{ stat.Sacks }}</td>
+            </tr>
             {% endfor %}
         </table>
         <canvas id="fantasyPointsChart"></canvas>
@@ -90,7 +141,12 @@ HTML_TEMPLATE = """
     {% endif %}
     <h3>News Around the League</h3>
     {% for article in league_news %}
-        <table><tr><td><a href="{{ article['Url'] }}">{{ article['Title'] }} ({{ article['TimeAgo'] }})</a></td><td>{{ article['Content'] }}</td></tr></table>
+        <table>
+            <tr>
+                <td><a href="{{ article['Url'] }}">{{ article['Title'] }} ({{ article['TimeAgo'] }})</a></td>
+                <td>{{ article['Content'] }}</td>
+            </tr>
+        </table>
     {% endfor %}
 </body>
 </html>
@@ -125,7 +181,15 @@ def search():
             }
             # Fetch player stats from PostgreSQL using Season
             with conn.cursor() as cur:
-                cur.execute("SELECT Week, HomeOrAway, Opponent, FantasyPointsPPR, PassingYards, RushingYards, ReceivingYards, Touchdowns, Interceptions, Fumbles, Tackles, Sacks FROM player_game_stats WHERE PlayerID = %s AND Season = %s ORDER BY Week", (player_id, selected_season))
+                query = """
+                    SELECT Week, HomeOrAway, Opponent, FantasyPointsPPR, PassingYards, 
+                           RushingYards, ReceivingYards, Touchdowns, Interceptions, Fumbles, 
+                           Tackles, Sacks 
+                    FROM player_game_stats 
+                    WHERE PlayerID = %s AND Season = %s 
+                    ORDER BY Week
+                """
+                cur.execute(query, (player_id, selected_season))
                 rows = cur.fetchall()
                 for row in rows:
                     weeks.append(row[0])
@@ -151,7 +215,15 @@ def search():
     if league_response.status_code == 200:
         league_news = league_response.json()[:5]  # Get the top 5 news items for the league
 
-    return render_template_string(HTML_TEMPLATE, league_news=league_news, player_name=player_name, player_info=player_info, player_stats=player_stats, weeks=weeks, fantasy_points_ppr=fantasy_points_ppr)
+    return render_template_string(
+        HTML_TEMPLATE, 
+        league_news=league_news, 
+        player_name=player_name, 
+        player_info=player_info, 
+        player_stats=player_stats, 
+        weeks=weeks, 
+        fantasy_points_ppr=fantasy_points_ppr
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, port=5010)
